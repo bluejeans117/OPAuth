@@ -61,6 +61,11 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     @Override
+    public void onBackPressed() {
+        Toast.makeText(getApplicationContext(), "You are not allowed to do that!", Toast.LENGTH_SHORT).show();
+    }
+
+    @Override
     public void onStart() {
         super.onStart();
         FirebaseAuth.getInstance().addAuthStateListener(mAuthListener);
