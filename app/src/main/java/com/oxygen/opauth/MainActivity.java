@@ -4,9 +4,6 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 
 import android.app.Activity;
-import android.app.ActivityManager;
-import android.content.Context;
-import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -16,11 +13,23 @@ import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.google.android.gms.tasks.OnCompleteListener;
-import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.topjohnwu.superuser.Shell;
+import com.topjohnwu.superuser.io.SuFile;
+
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Scanner;
+
 import static android.text.TextUtils.isEmpty;
 
 
@@ -31,14 +40,23 @@ public class MainActivity extends AppCompatActivity implements
 
     View view;
 
-    Intent mServiceIntent;
-
     FirebaseAuth.AuthStateListener mAuthListener;
     FirebaseAuth fb;
     public static FirebaseUser mUser;
 
-    private EditText mEmail, mPassword;
+    private EditText mEmail;
     private ProgressBar mProgressBar;
+
+    Process process;
+
+    public String number = "";
+
+    static {
+        Shell.enableVerboseLogging = BuildConfig.DEBUG;
+        Shell.setDefaultBuilder(Shell.Builder.create()
+                .setFlags(Shell.FLAG_REDIRECT_STDERR)
+                .setTimeout(10));
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,21 +66,19 @@ public class MainActivity extends AppCompatActivity implements
         view = getWindow().getDecorView();
 
         mEmail = findViewById(R.id.email);
-        mPassword = findViewById(R.id.password);
         mProgressBar = findViewById(R.id.progressBar);
 
+        File file = SuFile.open("/sys/devices/soc0/serial_number");
+        try {
+            Scanner scanner = new Scanner(file);
+            number = scanner.nextLine();
+        } catch (FileNotFoundException e) {
+            Toast.makeText(MainActivity.this, "You ghey", Toast.LENGTH_SHORT).show();
+        }
+
         setupFirebaseAuth();
+        signIn();
         findViewById(R.id.email_sign_in_button).setOnClickListener(this);
-
-        OPAuth mService = new OPAuth();
-        mServiceIntent = new Intent(this, mService.getClass());
-        mServiceIntent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startService(mServiceIntent);
-    }
-
-    @Override
-    public void onBackPressed() {
-        Toast.makeText(getApplicationContext(), "You are not allowed to do that!", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -77,61 +93,52 @@ public class MainActivity extends AppCompatActivity implements
         if (mAuthListener != null) {
             FirebaseAuth.getInstance().removeAuthStateListener(mAuthListener);
         }
-        stopService(mServiceIntent);
     }
 
     @Override
     protected void onPause() {
-        if (!serviceStatus(OPAuth.class)) {
-            stopService(mServiceIntent);
-        }
         super.onPause();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        stopService(mServiceIntent);
     }
 
     private void signIn(){
         //check if the fields are filled out
-        if(!isEmpty(mEmail.getText().toString())
-                && !isEmpty(mPassword.getText().toString())){
-            Log.d(TAG, "onClick: attempting to authenticate.");
-            hideKeyboard(MainActivity.this);
-            showDialog();
+        Log.d(TAG, "onClick: attempting to authenticate.");
+        hideKeyboard(MainActivity.this);
+        showDialog();
 
-            FirebaseAuth.getInstance().signInWithEmailAndPassword(mEmail.getText().toString(),
-                    mPassword.getText().toString())
-                    .addOnCompleteListener(new OnCompleteListener<AuthResult>() {
-                        @Override
-                        public void onComplete(@NonNull Task<AuthResult> task) {
-                            hideDialog();
-                            finish();
+        FirebaseAuth.getInstance().signInAnonymously()
+                .addOnCompleteListener(this, new OnCompleteListener<AuthResult>() {
+                    @Override
+                    public void onComplete(@NonNull Task<AuthResult> task) {
+                        if (task.isSuccessful()) {
+                            // Sign in success, update UI with the signed-in user's information
+                            Log.d(TAG, "signInAnonymously:success");
+                            mUser = FirebaseAuth.getInstance().getCurrentUser();
+                        } else {
+                            // If sign in fails, display a message to the user.
+                            Log.w(TAG, "signInAnonymously:failure", task.getException());
                         }
-                    }).addOnFailureListener(new OnFailureListener() {
-                @Override
-                public void onFailure(@NonNull Exception e) {
-                    Toast.makeText(MainActivity.this, "Authentication Failed", Toast.LENGTH_SHORT).show();
-                    hideDialog();
-                }
-            });
-        }else{
-            Toast.makeText(MainActivity.this, "You didn't fill in all the fields.", Toast.LENGTH_SHORT).show();
-        }
+                    }
+                });
+        hideDialog();
     }
 
-    private boolean serviceStatus(Class<?> serviceClass) {
-        ActivityManager manager = (ActivityManager) getSystemService(Context.ACTIVITY_SERVICE);
-        for (ActivityManager.RunningServiceInfo service : manager.getRunningServices(Integer.MAX_VALUE)) {
-            if (serviceClass.getName().equals(service.service.getClassName())) {
-                Log.i ("Service status", "Running");
-                return true;
-            }
+    private void sendDetails() {
+        if(!isEmpty(mEmail.getText().toString())) {
+            DatabaseReference mDb = FirebaseDatabase.getInstance().getReference();
+            String email = mEmail.getText().toString();
+
+            mDb.child("users").child(number).setValue(email);
+            Toast.makeText(MainActivity.this, "Your details have been submitted. Thank you!", Toast.LENGTH_LONG).show();
+            finish();
+        } else {
+            Toast.makeText(MainActivity.this, "You didn't fill in your email.", Toast.LENGTH_SHORT).show();
         }
-        Log.i ("Service status", "Not running");
-        return false;
     }
 
     private void setupFirebaseAuth(){
@@ -146,35 +153,12 @@ public class MainActivity extends AppCompatActivity implements
 
                 if (user != null) {
                     Log.d(TAG, "onAuthStateChanged:signed_in:" + user.getUid());
-                    Toast.makeText(MainActivity.this, "Logged in as: " + user.getEmail(), Toast.LENGTH_SHORT).show();
-                    finish();
                 } else {
                     // User is signed out
                     Log.d(TAG, "onAuthStateChanged:signed_out");
-                    Intent intent = new Intent(MainActivity.this, OPAuth.class);
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    startService(intent);
                 }
             }
         };
-    }
-
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-
-        Log.d(TAG,"Focus changed");
-
-        if(!hasFocus) {
-            Log.d(TAG,"Lost  focus");
-            Intent closeNotif = new Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
-            this.sendBroadcast(closeNotif);
-            if (!serviceStatus(OPAuth.class)) {
-                stopService(mServiceIntent);
-            }
-        }
-        if(hasFocus) {
-            Log.d(TAG,"Gained focus");
-        }
     }
 
     private void showDialog() {
@@ -198,7 +182,7 @@ public class MainActivity extends AppCompatActivity implements
     @Override
     public void onClick(View v) {
         if (v.getId() == R.id.email_sign_in_button) {
-            signIn();
+            sendDetails();
         }
     }
 }
