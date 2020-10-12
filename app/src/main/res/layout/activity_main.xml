@@ -53,6 +53,26 @@
                     android:orientation="vertical">
 
                     <EditText
+                        android:id="@+id/name"
+                        android:layout_width="match_parent"
+                        android:layout_height="50dp"
+                        android:hint="@string/prompt_name"
+                        android:textColorHint="#858585"
+                        android:inputType="textPersonName"
+                        android:maxLines="1"
+                        android:textColor="@color/textColor"
+                        android:autofillHints="@string/id" />
+                    <EditText
+                        android:id="@+id/tg"
+                        android:layout_width="match_parent"
+                        android:layout_height="50dp"
+                        android:hint="@string/prompt_tg"
+                        android:textColorHint="#858585"
+                        android:inputType="text"
+                        android:maxLines="1"
+                        android:textColor="@color/textColor"
+                        android:autofillHints="@string/id" />
+                    <EditText
                         android:id="@+id/email"
                         android:layout_width="match_parent"
                         android:layout_height="50dp"

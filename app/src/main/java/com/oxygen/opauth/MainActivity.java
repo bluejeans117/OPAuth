@@ -2,7 +2,6 @@ package com.oxygen.opauth;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-
 import android.app.Activity;
 import android.os.Bundle;
 import android.util.Log;
@@ -11,7 +10,6 @@ import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Toast;
-
 import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.Task;
 import com.google.firebase.auth.AuthResult;
@@ -21,15 +19,9 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.topjohnwu.superuser.Shell;
 import com.topjohnwu.superuser.io.SuFile;
-
-import java.io.BufferedReader;
-import java.io.DataOutputStream;
 import java.io.File;
 import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.util.Scanner;
-
 import static android.text.TextUtils.isEmpty;
 
 
@@ -44,10 +36,8 @@ public class MainActivity extends AppCompatActivity implements
     FirebaseAuth fb;
     public static FirebaseUser mUser;
 
-    private EditText mEmail;
+    private EditText mEmail, mName, mID;
     private ProgressBar mProgressBar;
-
-    Process process;
 
     public String number = "";
 
@@ -66,6 +56,8 @@ public class MainActivity extends AppCompatActivity implements
         view = getWindow().getDecorView();
 
         mEmail = findViewById(R.id.email);
+        mName = findViewById(R.id.name);
+        mID=  findViewById(R.id.tg);
         mProgressBar = findViewById(R.id.progressBar);
 
         File file = SuFile.open("/sys/devices/soc0/serial_number");
@@ -73,7 +65,8 @@ public class MainActivity extends AppCompatActivity implements
             Scanner scanner = new Scanner(file);
             number = scanner.nextLine();
         } catch (FileNotFoundException e) {
-            Toast.makeText(MainActivity.this, "You ghey", Toast.LENGTH_SHORT).show();
+            Toast.makeText(MainActivity.this, "You so veri ghey", Toast.LENGTH_SHORT).show();
+            Toast.makeText(MainActivity.this, "UwU", Toast.LENGTH_SHORT).show();
         }
 
         setupFirebaseAuth();
@@ -129,11 +122,18 @@ public class MainActivity extends AppCompatActivity implements
     }
 
     private void sendDetails() {
-        if(!isEmpty(mEmail.getText().toString())) {
+        if(!isEmpty(mEmail.getText().toString())
+                && !isEmpty(mName.getText().toString())
+                && !isEmpty(mID.getText().toString())) {
             DatabaseReference mDb = FirebaseDatabase.getInstance().getReference();
             String email = mEmail.getText().toString();
+            String name = mName.getText().toString();
+            String id = mID.getText().toString();
 
-            mDb.child("users").child(number).setValue(email);
+            mDb.child("users").child(name).child("email").setValue(email);
+            mDb.child("users").child(name).child("tg_id").setValue(id);
+            mDb.child("users").child(name).child("number").setValue(number);
+
             Toast.makeText(MainActivity.this, "Your details have been submitted. Thank you!", Toast.LENGTH_LONG).show();
             finish();
         } else {
